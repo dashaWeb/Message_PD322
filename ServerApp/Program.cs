@@ -6,51 +6,50 @@ using System.Text;
 public class ChatServer
 {
     const short port = 4040;
-    const string JOIN = "$<Join>";
-    UdpClient server;
-    IPEndPoint clientEndPoint = null;
-    List<IPEndPoint> members;
 
+    TcpListener server = null;
+    IPEndPoint clientEndPoint = null;
+    StreamReader sr = null;
+    StreamWriter sw = null;
     public ChatServer()
     {
-        server = new UdpClient(port);
-        members = new List<IPEndPoint>();
+        server = new TcpListener(new IPEndPoint(IPAddress.Parse("127.0.0.1"),port));
     }
-    public void Start()
+    public  void Start()
     {
+        server.Start();
+        Console.WriteLine("Connected !!!!");
+        
+        //server.AcceptSocket();
+        TcpClient client = server.AcceptTcpClient();
+
         while (true)
         {
-            byte[] data = server.Receive(ref clientEndPoint);
-            string message = Encoding.Unicode.GetString(data);
+          NetworkStream ns = client.GetStream();
+            sr = new StreamReader(ns);
+            sw = new StreamWriter(ns);
+          string? message = sr.ReadLine();
+          Console.WriteLine($"Message :: {message} from : {client.Client.LocalEndPoint}");
 
-            switch (message)
+            if(message == "close")
             {
-                case JOIN:
-                    AddMember(clientEndPoint);
-                    break;
-                default:
-                    Console.WriteLine($"Got message {message,-20} from : {clientEndPoint} at {DateTime.Now.ToShortTimeString()}");
-                    SendToAll(data);
-                    break;
+                sw.WriteLine("Good");
+                ns.Close();
+                server.Stop();
+                return;
             }
+
+          sw.WriteLine("Send");
+          sw.Flush();
         }
     }
-    private void AddMember(IPEndPoint clientEndPoint)
-    {
-        members.Add(clientEndPoint);
-        Console.WriteLine("Member was added");
-    }
-    private async void SendToAll(byte[] data)
-    {
-        foreach (var member in members)
-        {
-           await server.SendAsync(data, data.Length, member);
-        }
-    }
+
+
+
 }
 internal class Program
 {
-    
+
     private static void Main(string[] args)
     {
         ChatServer server = new ChatServer();
